@@ -76,7 +76,7 @@ class RunFTL():
         self.lineno = lineno
         self.write_only = bool(int(write_only))
 
-        self.conf = create_config(ftl)
+        self.conf = create_config(ftl) # config.py 가보면, 상위 클래스 상속 따라가보면 결국에 얘는 dict기반임.
         self.conf['SSDFramework']['ncq_depth'] = ncq_depth
         self.conf['flash_config']['page_size'] = page_size
 
@@ -90,10 +90,11 @@ class RunFTL():
 
         self.events = parse_events(self.trace, self.conf.page_size, recorder=recorder, start_lineno = start_lineno, lineno=self.lineno, write_only=self.write_only)
 
-        self.conf.update(xargs)
+        self.conf.update(xargs) # dictionary 자체 내장 update함수
 
     def run(self):
-        eval(self.func)
+        eval(self.func) # self.func = "self.run_%s()" % "learnedftl" 문자열을 수행한다. (%s자리에 learndftl들어가는 formatting)
+
     
     def statistics():
         pass

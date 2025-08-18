@@ -29,8 +29,67 @@ from wiscsim.devblockpool import *
 from ftlsim_commons import *
 from commons import *
 import dftldes
+import ctypes, os
+
+# try:
+#     # Standard CPython with ctypes
+#     CLOCK_MONOTONIC = 1 
+#     libc = ctypes.CDLL('librt.so.1', use_errno=True)
+#     clock_gettime = libc.clock_gettime
+    
+#     class Timespec(ctypes.Structure):
+#         _fields_ = [
+#             ('tv_sec', ctypes.c_long),
+#             ('tv_nsec', ctypes.c_long)
+#         ]
+
+#     def monotonic_time():
+#         t = Timespec()
+#         if clock_gettime(CLOCK_MONOTONIC, ctypes.pointer(t)) != 0:
+#             errno_ = ctypes.get_errno()
+#             raise OSError(errno_, os.strerror(errno_))
+#         return t.tv_sec + t.tv_nsec * 1e-9
+# except (OSError, AttributeError):
+#     # Fallback for systems where librt is not available or for PyPy without cffi
+#     # time.clock() on Unix measures CPU time and is monotonic for a process.
+#     # This is a suitable fallback for benchmarking code execution.
+#     monotonic_time = time.clock 
+
+# 1. C++에서 정의한 구조체들을 Python ctypes로 정의
+class SegmentResult(ctypes.Structure):
+    _fields_ = [("k", ctypes.c_double),
+                ("b", ctypes.c_double),
+                ("x1", ctypes.c_long),
+                ("x2", ctypes.c_long)]
+
+class TimingResult(ctypes.Structure):
+    _fields_ = [("total_duration_sec", ctypes.c_double),
+                ("sorting_duration_sec", ctypes.c_double),
+                ("training_duration_sec", ctypes.c_double)]
+
+class PlrResult(ctypes.Structure):
+    _fields_ = [("segments", ctypes.POINTER(SegmentResult)),
+                ("segment_count", ctypes.c_int),
+                ("timings", TimingResult)]
+
+# 2. 컴파일된 .so 라이브러리 로드
+libplr = ctypes.CDLL(os.path.join(os.path.dirname(__file__), 'libplr.so'))
+
+# 3. C++ 함수의 인자와 반환 타입을 Python에 알려줌
+libplr.learn_and_time_segments.argtypes = [
+    ctypes.POINTER(ctypes.c_long), 
+    ctypes.POINTER(ctypes.c_long), 
+    ctypes.c_int, 
+    ctypes.c_double
+]
+libplr.learn_and_time_segments.restype = ctypes.POINTER(PlrResult)
+
+libplr.free_plr_result.argtypes = [ctypes.POINTER(PlrResult)]
 
 LPN_TO_DEBUG = -1
+
+LEARNING_SAMPLES = []
+FLASH_WRITE_SAMPLES = []
 
 # some constants
 LPN_BYTES = 4
@@ -98,6 +157,64 @@ class Ftl(ftlbuilder.FtlBuilder):
 
     def end_ssd(self):
 
+        log_msg("="*15, "MODEL CREATION TIME ANALYSIS (ESTIMATED for 256-batch)", "="*15)
+
+        total_entries_processed = 0
+        total_sorting_sec = 0
+        total_training_sec = 0
+        total_build_sec = 0
+
+        # 모든 샘플을 순회하며 총 시간과 총 엔트리 수를 누적
+        for size, train_t, sort_t, total_t in LEARNING_SAMPLES:
+            if size > 0:
+                total_entries_processed += size
+                total_sorting_sec += sort_t
+                total_training_sec += train_t
+                total_build_sec += total_t
+        
+        if total_entries_processed > 0:
+            # 엔트리 1개당 평균 소요 시간 계산 (초 단위)
+            avg_sort_per_entry = total_sorting_sec / total_entries_processed
+            avg_train_per_entry = total_training_sec / total_entries_processed
+            avg_total_per_entry = total_build_sec / total_entries_processed
+
+            # 256개 배치일 경우의 예상 시간 계산 (마이크로초 단위)
+            estimated_sort_256_us = avg_sort_per_entry * 256 * 1000000
+            estimated_train_256_us = avg_train_per_entry * 256 * 1000000
+            estimated_total_256_us = avg_total_per_entry * 256 * 1000000
+
+            log_msg("Total entries processed in {} batches: {}".format(len(LEARNING_SAMPLES), total_entries_processed))
+            log_msg("-" * 40)
+            log_msg("Estimated Avg Sorting Time (256-batch): {:.2f} us".format(estimated_sort_256_us))
+            log_msg("Estimated Avg Core Learning Time (256-batch): {:.2f} us".format(estimated_train_256_us))
+            log_msg("Estimated Avg Total Model Build Time (256-batch): {:.2f} us".format(estimated_total_256_us))
+            log_msg("-" * 40)
+        else:
+            log_msg("No learning batches were processed.")
+        log_msg("="*80)
+
+        log_msg("="*25, "FLASH WRITE TIME ANALYSIS", "="*25)
+        
+        total_flash_write_duration = 0
+        total_pages_written_to_flash = 0
+
+        for duration, num_pages in FLASH_WRITE_SAMPLES:
+            total_flash_write_duration += duration
+            total_pages_written_to_flash += num_pages
+
+        if total_pages_written_to_flash > 0:
+            # 페이지당 평균 쓰기 시간 계산 (마이크로초 단위)
+            avg_write_time_per_page_us = (total_flash_write_duration / total_pages_written_to_flash) / 1000.0
+
+            log_msg("Total pages physically written: {}".format(total_pages_written_to_flash))
+            log_msg("Total time spent on flash writes: {:.2f} ms".format(total_flash_write_duration / 1000000.0))
+            log_msg("-" * 40)
+            log_msg("Avg Flash Write Time per Page: {:.2f} us".format(avg_write_time_per_page_us))
+            log_msg("-" * 40)
+        else:
+            log_msg("No physical flash writes were recorded.")
+        log_msg("="*80)
+        
         self.metadata.mapping_table.compact(promote=True)
 
         log_msg("End-to-end overall response time per page: %.2fus; Num of requests %d" % ((np.sum(self.write_latencies) + np.sum(self.read_latencies)) /  (self.waf["request"] + self.raf['request']), self.waf["request"] + self.raf['request']))
@@ -462,9 +579,27 @@ class Ftl(ftlbuilder.FtlBuilder):
         The ppns in mappings is obtained from loggroup.next_ppns()
         """
         # flash controller
+        # yield self.env.process(
+        #     self.des_flash.rw_ppns(ppns, 'write',
+        #                            tag="Unknown"))
+
+        # self.env.exit((0, 0))
+        if not ppns: # 빈 리스트는 무시
+            self.env.exit((0,0))
+            return
+
+        start_time = self.env.now
+        
+        # flash controller
         yield self.env.process(
             self.des_flash.rw_ppns(ppns, 'write',
                                    tag="Unknown"))
+
+        end_time = self.env.now
+        duration = end_time - start_time
+        
+        # (쓰기에 걸린 시간, 쓰여진 페이지 수)를 기록
+        FLASH_WRITE_SAMPLES.append((duration, len(ppns)))
 
         self.env.exit((0, 0))
 
@@ -1029,7 +1164,7 @@ class FlashMetadata(object):
             for ppn, accurate, seg in results:
                 if seg:
                     print("learned segment:", seg.full_str())
-                print("oob data:", str(self.oob.oob_data[ppn]))
+                # print("oob data:", str(self.oob.oob_data[ppn]))
             exit(0)
 
 # Learning-related components
@@ -1092,9 +1227,10 @@ class Segment():
         self.x2 = x2
         self.accurate = True
         self.filter = None
+        self._points = points  # set of points only for verification purpose
 
         if points:
-            self._points = points  # set of points only for verification purpose
+            # self._points = points  # set of points only for verification purpose
             self.accurate, consecutive = self.check_properties(points)
 
             if not consecutive:
@@ -1108,8 +1244,8 @@ class Segment():
                     for pt in points:
                         self.filter.add(pt[0])
         
-        if LPN_TO_DEBUG in zip(*points)[0]:
-            log_msg("new seg", self)
+            if LPN_TO_DEBUG in zip(*points)[0]:
+                log_msg("new seg", self)
 
     def __str__(self):
         return "%.4f, %d, [%d, %d], memory: %dB, accuracy: %s, bitmap: %s" \
@@ -1428,18 +1564,90 @@ class LogPLR():
         # mapping from block to segments
         # self.block_map = defaultdict(list)
     
-    def update(self, entries, blocknum):
-        # make sure no same LPNs exist in the entries
-        sorted_entries = sorted(entries)
-        # make sure no same 'x1's exist in the new_segments
-        self.plr.init()
-        new_segments = self.plr.learn(sorted_entries)
-        new_segments = sorted(new_segments, key=lambda x: x.x1)
-        # self.block_map[blocknum].extend(new_segments)
-        # make sure no overlap at each level
-        self.add_segments(0, new_segments, recursive=False)
-        return [], []
+    # def update(self, entries, blocknum):
+    #     # make sure no same LPNs exist in the entries
+    #     sorted_entries = sorted(entries)
+    #     # make sure no same 'x1's exist in the new_segments
+    #     self.plr.init()
+    #     new_segments = self.plr.learn(sorted_entries)
+    #     new_segments = sorted(new_segments, key=lambda x: x.x1)
+    #     # self.block_map[blocknum].extend(new_segments)
+    #     # make sure no overlap at each level
+    #     self.add_segments(0, new_segments, recursive=False)
+    #     return [], []
 
+    # def update(self, entries, blocknum):
+    #     model_creation_start_time = monotonic_time()
+
+    #     sort_start_time = monotonic_time()
+    #     sorted_entries = sorted(entries)
+    #     sort_end_time = monotonic_time()
+    #     sorting_duration_sec = sort_end_time - sort_start_time
+
+    #     batch_size = len(sorted_entries)
+    #     print("!**batch size:{}**".format(batch_size))
+    #     self.plr.init()
+
+    #     training_start_time = monotonic_time()
+    #     new_segments = self.plr.learn(sorted_entries)
+    #     training_end_time = monotonic_time()
+    #     training_duration_sec = training_end_time - training_start_time
+        
+    #     new_segments = sorted(new_segments, key=lambda x: x.x1)
+    #     self.add_segments(0, new_segments, recursive=False)
+        
+    #     model_creation_end_time = monotonic_time()
+    #     model_creation_duration_sec = model_creation_end_time - model_creation_start_time
+        
+    #     LEARNING_SAMPLES.append((batch_size, training_duration_sec, sorting_duration_sec, model_creation_duration_sec))
+
+    #     return [], []
+
+    def update(self, entries, blocknum):       
+        num_points = len(entries)
+        if num_points == 0:
+            return [], []
+
+        # Python 리스트를 C 배열로 변환
+        lpns = [e[0] for e in entries]
+        ppns = [e[1] for e in entries]
+        lpn_array = (ctypes.c_long * num_points)(*lpns)
+        ppn_array = (ctypes.c_long * num_points)(*ppns)
+        
+        # C++ 함수 호출!
+        c_result_ptr = libplr.learn_and_time_segments(
+            lpn_array, ppn_array, num_points, self.plr.gamma
+        )
+        
+        # 결과 추출
+        timings = c_result_ptr.contents.timings
+        segment_count = c_result_ptr.contents.segment_count
+        
+        # 측정 결과 저장 (배치 크기, 학습 시간, 정렬 시간, 전체 시간)
+        LEARNING_SAMPLES.append((
+            num_points, 
+            timings.training_duration_sec, 
+            timings.sorting_duration_sec, 
+            timings.total_duration_sec
+        ))
+
+        # C++ 결과(배열)를 Python Segment 객체 리스트로 변환
+        new_segments = []
+        for i in range(segment_count):
+            c_seg = c_result_ptr.contents.segments[i]
+            # C++ 결과를 Python의 Segment 객체로 변환 (points 정보는 None)
+            py_seg = Segment(c_seg.k, c_seg.b, c_seg.x1, c_seg.x2, points=None)
+            new_segments.append(py_seg)
+
+        # C++에서 할당한 메모리 해제 (매우 중요!)
+        libplr.free_plr_result(c_result_ptr)
+
+        # 나머지 로직 (Python)
+        new_segments = sorted(new_segments, key=lambda x: x.x1)
+        self.add_segments(0, new_segments, recursive=False)
+        
+        return [], []
+        
     def merge(self, old_plr):
         assert(self.frame_no == old_plr.frame_no)
         self.runs.extend(old_plr.runs)

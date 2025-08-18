@@ -70,12 +70,13 @@ class BatchArg:
         return expandedArg
 
 
-    def cmd(self):
+    def cmd(self):  
+        PYPY_PATH = "/home/hosing/LeaFTL/pypy2.7-v7.3.9-linux64/bin/pypy"
         ret =  " ".join(["-%s %s" % (BatchArg.op_mapping[k], v) for k, v in self.batchArg.items() if v != None])
         if not STDOUT:
-            ret = f"pypy run_ftl {ret} -o {self.output_dir} >> {self.output_path}"
+            ret = f"{PYPY_PATH} run_ftl {ret} -o {self.output_dir} >> {self.output_path}"
         else:
-            ret = f"pypy run_ftl {ret} -o {self.output_dir}"
+            ret = f"{PYPY_PATH} run_ftl {ret} -o {self.output_dir}"
         return ret
 
 class BatchArgGenerator:
@@ -151,11 +152,13 @@ def main_batch(generator, warmup):
     batch = defaultdict(list)
     batch['start_lineno'] = [0]
     batch['lineno'] = [1000000000]
-    batch['trace'] = ["MSR-Cambridge/usr_0.csv", "MSR-Cambridge/prn_0.csv", "MSR-Cambridge/src2_0.csv", "MSR-Cambridge/hm_0.csv", "MSR-Cambridge/prxy_0.csv", 'FIU/homes/homes-110108-112108.1.blkparse', 'FIU/mail/cheetah.cs.fiu.edu-110108-113008.1.blkparse']
+    # batch['trace'] = ["MSR-Cambridge/usr_0.csv", "MSR-Cambridge/prn_0.csv", "MSR-Cambridge/src2_0.csv", "MSR-Cambridge/hm_0.csv", "MSR-Cambridge/prxy_0.csv", 'FIU/homes/homes-110108-112108.1.blkparse', 'FIU/mail/cheetah.cs.fiu.edu-110108-113008.1.blkparse']
+    batch['trace'] = ["MSR-Cambridge/usr_0.csv"]
     
-    sftl_cache_size = DRAM_SIZE - warmup["sftl"]*WARMUP_RATIO // MB - BITMAP_SIZE
-    leaftl_cache_size = DRAM_SIZE - warmup["learnedftl-0"]*WARMUP_RATIO // MB - BITMAP_SIZE
-    batch[('ftl', 'gamma', 'cache', 'mapping_cache')] = [("dftldes", 1e-4, BUFFER_SIZE, DRAM_SIZE-BUFFER_SIZE), ("sftl", 1e-4, sftl_cache_size, DRAM_SIZE-sftl_cache_size),("learnedftl", 1e-4, leaftl_cache_size, DRAM_SIZE-leaftl_cache_size)] 
+    # sftl_cache_size = DRAM_SIZE - warmup["sftl"]*WARMUP_RATIO // MB - BITMAP_SIZE
+    # leaftl_cache_size = DRAM_SIZE - warmup["learnedftl-0"]*WARMUP_RATIO // MB - BITMAP_SIZE
+    # batch[('ftl', 'gamma', 'cache', 'mapping_cache')] = [("dftldes", 1e-4, BUFFER_SIZE, DRAM_SIZE-BUFFER_SIZE), ("sftl", 1e-4, sftl_cache_size, DRAM_SIZE-sftl_cache_size),("learnedftl", 1e-4, leaftl_cache_size, DRAM_SIZE-leaftl_cache_size)] 
+    batch[('ftl', 'gamma', 'cache', 'mapping_cache')] = [("learnedftl", 1e-4, BUFFER_SIZE, DRAM_SIZE-BUFFER_SIZE)] 
 
     batch['write_only'] = [0]
     batch['ncq_depth'] = [1]
@@ -237,6 +240,7 @@ if __name__ == "__main__":
             next_batch = [unfinished_batch.pop(0)]
 
             for batchArg in next_batch:
+                # parallelism 개수 만큼 process 생성, 논문은 "an"이라고 명시.
                 proc = subprocess.Popen(batchArg.cmd(), cwd=BASE_PATH, shell=True)
                 procs[proc] = batchArg
                 log_msg(f"Running job {proc.pid}: {batchArg}")
