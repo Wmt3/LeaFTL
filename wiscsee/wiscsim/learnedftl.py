@@ -157,14 +157,14 @@ class Ftl(ftlbuilder.FtlBuilder):
 
     def end_ssd(self):
 
-        log_msg("="*15, "MODEL CREATION TIME ANALYSIS (ESTIMATED for 256-batch)", "="*15)
+        log_msg("="*15, "MODEL CREATION TIME ANALYSIS (PER BATCH)", "="*15)
 
         total_entries_processed = 0
         total_sorting_sec = 0
         total_training_sec = 0
         total_build_sec = 0
 
-        # 모든 샘플을 순회하며 총 시간과 총 엔트리 수를 누적
+        # LEARNING_SAMPLES: (배치 크기, 학습 시간, 정렬 시간, 전체 시간)
         for size, train_t, sort_t, total_t in LEARNING_SAMPLES:
             if size > 0:
                 total_entries_processed += size
@@ -173,12 +173,10 @@ class Ftl(ftlbuilder.FtlBuilder):
                 total_build_sec += total_t
         
         if total_entries_processed > 0:
-            # 엔트리 1개당 평균 소요 시간 계산 (초 단위)
             avg_sort_per_entry = total_sorting_sec / total_entries_processed
             avg_train_per_entry = total_training_sec / total_entries_processed
             avg_total_per_entry = total_build_sec / total_entries_processed
 
-            # 256개 배치일 경우의 예상 시간 계산 (마이크로초 단위)
             estimated_sort_256_us = avg_sort_per_entry * 256 * 1000000
             estimated_train_256_us = avg_train_per_entry * 256 * 1000000
             estimated_total_256_us = avg_total_per_entry * 256 * 1000000
@@ -188,31 +186,52 @@ class Ftl(ftlbuilder.FtlBuilder):
             log_msg("Estimated Avg Sorting Time (256-batch): {:.2f} us".format(estimated_sort_256_us))
             log_msg("Estimated Avg Core Learning Time (256-batch): {:.2f} us".format(estimated_train_256_us))
             log_msg("Estimated Avg Total Model Build Time (256-batch): {:.2f} us".format(estimated_total_256_us))
-            log_msg("-" * 40)
         else:
             log_msg("No learning batches were processed.")
         log_msg("="*80)
 
-        log_msg("="*25, "FLASH WRITE TIME ANALYSIS", "="*25)
+        log_msg("="*25, "FLASH WRITE TIME ANALYSIS (PER PAGE)", "="*25)
         
-        total_flash_write_duration = 0
+        total_flash_write_duration_ns = 0
         total_pages_written_to_flash = 0
 
+        # FLASH_WRITE_SAMPLES: (쓰기 소요 시간(ns), 쓰여진 페이지 수)
         for duration, num_pages in FLASH_WRITE_SAMPLES:
-            total_flash_write_duration += duration
+            total_flash_write_duration_ns += duration
             total_pages_written_to_flash += num_pages
 
         if total_pages_written_to_flash > 0:
-            # 페이지당 평균 쓰기 시간 계산 (마이크로초 단위)
-            avg_write_time_per_page_us = (total_flash_write_duration / total_pages_written_to_flash) / 1000.0
+            avg_write_time_per_page_us = (total_flash_write_duration_ns / total_pages_written_to_flash) / 1000.0
 
             log_msg("Total pages physically written: {}".format(total_pages_written_to_flash))
-            log_msg("Total time spent on flash writes: {:.2f} ms".format(total_flash_write_duration / 1000000.0))
+            log_msg("Total time spent on flash writes: {:.2f} ms".format(total_flash_write_duration_ns / 1000000.0))
             log_msg("-" * 40)
             log_msg("Avg Flash Write Time per Page: {:.2f} us".format(avg_write_time_per_page_us))
-            log_msg("-" * 40)
         else:
             log_msg("No physical flash writes were recorded.")
+        log_msg("="*80)
+
+        # === 추가된 부분: Flush 당 평균 시간 분석 ===
+        log_msg("="*20, "AVERAGE TIME ANALYSIS PER FLUSH", "="*20)
+        
+        # flush 횟수는 학습 이벤트 발생 횟수와 동일
+        num_flushes = len(LEARNING_SAMPLES)
+        
+        if num_flushes > 0:
+            # Flush 당 평균 학습 시간 (단위: 마이크로초)
+            # total_build_sec는 LEARNING_SAMPLES에 기록된 전체 학습 시간의 합 (초 단위)
+            avg_learning_time_per_flush_us = (total_build_sec / num_flushes) * 1000000.0
+            
+            # Flush 당 평균 플래시 쓰기 시간 (단위: 마이크로초)
+            # total_flash_write_duration_ns는 FLASH_WRITE_SAMPLES에 기록된 전체 쓰기 시간의 합 (나노초 단위)
+            avg_write_time_per_flush_us = (total_flash_write_duration_ns / num_flushes) / 1000.0
+
+            log_msg("Total number of flushes: {}".format(num_flushes))
+            log_msg("-" * 40)
+            log_msg("Avg Learning Time per Flush: {:.2f} us".format(avg_learning_time_per_flush_us))
+            log_msg("Avg Flash Write Time per Flush: {:.2f} us".format(avg_write_time_per_flush_us))
+        else:
+            log_msg("No flush events were recorded.")
         log_msg("="*80)
         
         self.metadata.mapping_table.compact(promote=True)
