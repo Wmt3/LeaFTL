@@ -31,29 +31,29 @@ from commons import *
 import dftldes
 import ctypes, os
 
-# try:
-#     # Standard CPython with ctypes
-#     CLOCK_MONOTONIC = 1 
-#     libc = ctypes.CDLL('librt.so.1', use_errno=True)
-#     clock_gettime = libc.clock_gettime
+try:
+    # Standard CPython with ctypes
+    CLOCK_MONOTONIC = 1 
+    libc = ctypes.CDLL('librt.so.1', use_errno=True)
+    clock_gettime = libc.clock_gettime
     
-#     class Timespec(ctypes.Structure):
-#         _fields_ = [
-#             ('tv_sec', ctypes.c_long),
-#             ('tv_nsec', ctypes.c_long)
-#         ]
+    class Timespec(ctypes.Structure):
+        _fields_ = [
+            ('tv_sec', ctypes.c_long),
+            ('tv_nsec', ctypes.c_long)
+        ]
 
-#     def monotonic_time():
-#         t = Timespec()
-#         if clock_gettime(CLOCK_MONOTONIC, ctypes.pointer(t)) != 0:
-#             errno_ = ctypes.get_errno()
-#             raise OSError(errno_, os.strerror(errno_))
-#         return t.tv_sec + t.tv_nsec * 1e-9
-# except (OSError, AttributeError):
-#     # Fallback for systems where librt is not available or for PyPy without cffi
-#     # time.clock() on Unix measures CPU time and is monotonic for a process.
-#     # This is a suitable fallback for benchmarking code execution.
-#     monotonic_time = time.clock 
+    def monotonic_time():
+        t = Timespec()
+        if clock_gettime(CLOCK_MONOTONIC, ctypes.pointer(t)) != 0:
+            errno_ = ctypes.get_errno()
+            raise OSError(errno_, os.strerror(errno_))
+        return t.tv_sec + t.tv_nsec * 1e-9
+except (OSError, AttributeError):
+    # Fallback for systems where librt is not available or for PyPy without cffi
+    # time.clock() on Unix measures CPU time and is monotonic for a process.
+    # This is a suitable fallback for benchmarking code execution.
+    monotonic_time = time.clock 
 
 # 1. C++에서 정의한 구조체들을 Python ctypes로 정의
 class SegmentResult(ctypes.Structure):
@@ -90,6 +90,10 @@ LPN_TO_DEBUG = -1
 
 LEARNING_SAMPLES = []
 FLASH_WRITE_SAMPLES = []
+my_learn_per_flush = []
+total_my_learn_per_flush = []
+my_write_per_flush = []
+total_my_write_per_flush = []
 
 # some constants
 LPN_BYTES = 4
@@ -233,6 +237,11 @@ class Ftl(ftlbuilder.FtlBuilder):
         else:
             log_msg("No flush events were recorded.")
         log_msg("="*80)
+
+        log_msg("="*10, "My Learn and Write Per Flush","="*10)
+        log_msg("Avg Learning Time per Flush: {:.2f} us".format(total_my_learn_per_flush/len(total_my_learn_per_flush)))
+        log_msg("Avg Flash Write Time per Flush: {:.2f} us".format(total_my_write_per_flush/len(total_my_write_per_flush)))
+
         
         self.metadata.mapping_table.compact(promote=True)
 
@@ -505,7 +514,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         op_id = self.recorder.get_unique_num()
         write_procs = []
         total_pages_to_write = []
-        for ext in extents:
+        for ext in extents: # extents는 [ (LPN 100 쓰기 요청), (LPN 101 쓰기 요청), (LPN 102 쓰기 요청), (LPN 103 쓰기 요청) ] 과 같은 단일 페이지 쓰기 요청들의 리스트
             # if cached:
             #     assert(ext.lpn_count == 1)
             #     writeback, lpn_previous = self.datacache.write(ext.lpn_start)
@@ -526,7 +535,7 @@ class Ftl(ftlbuilder.FtlBuilder):
             # TODO: should we modify data cache here? Jinghan: Done
             # FIXME: check if there is any bug here
             # self.datacache.read(ext.lpn_start)
-            writeback, ppn = self.rw_cache.write(ext.lpn_start)
+            writeback, ppn = self.rw_cache.write(ext.lpn_start) # 순회 중인 단일 페이지 쓰기 요청(ext)을 버퍼(self.rw_cache)에 넣어
             if writeback:
                 p = self.env.process(self._write_ppns([ppn]))
                 write_procs.append(p)
@@ -534,9 +543,15 @@ class Ftl(ftlbuilder.FtlBuilder):
 
             
             # self.datacache.invalidate(ext)
-            if self.rw_cache.should_assign_page():
+            if self.rw_cache.should_assign_page(): # 방금 페이지 하나를 넣었더니 버퍼가 꽉 찼는지를 확인
                 exts = self.rw_cache.flush_unassigned()
-                mappings, pages_to_read, pages_to_write = self.metadata.update(exts)
+                mappings, pages_to_read, pages_to_write = self.metadata.update(exts) # 메타 데이터 플러시
+
+                sums = sum(my_learn_per_flush)
+                my_learn_per_flush.clear()
+                total_my_learn_per_flush.append(sums*1000000) # 마이크로초 변환
+                print("learn : [%d flush] : {%.2f}".format(len(total_my_learn_per_flush),total_my_learn_per_flush[-1]))
+
                 self.rw_cache.update_assigned(mappings)
                 total_pages_to_write.extend(pages_to_write)
                 # if len(pages_to_read) != 0 or len(pages_to_write) != 0:
@@ -549,8 +564,13 @@ class Ftl(ftlbuilder.FtlBuilder):
             #     self.counter += len(exts)
             #     mappings = self.metadata.update(exts)
                 for ppn in pages_to_write:
-                    p = self.env.process(self._write_ppns([ppn]))
+                    p = self.env.process(self._write_ppns([ppn])) # 실제 데이터 플러시
                     write_procs.append(p)
+
+                sums = sum(my_write_per_flush)
+                my_write_per_flush.clear()
+                total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
+                print("write : [%d flush] : {%.2f}".format(len(total_my_write_per_flush),total_my_write_per_flush[-1]))
 
                 for ppn in pages_to_read:
                     p = self.env.process(self._read_ppns([ppn]))
@@ -619,6 +639,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         
         # (쓰기에 걸린 시간, 쓰여진 페이지 수)를 기록
         FLASH_WRITE_SAMPLES.append((duration, len(ppns)))
+        my_write_per_flush.append(duration*1000000) # 마이크로초 변환
 
         self.env.exit((0, 0))
 
@@ -1650,6 +1671,8 @@ class LogPLR():
             timings.total_duration_sec
         ))
 
+        my_learn_per_flush.append(timings.training_duration_sec)
+
         # C++ 결과(배열)를 Python Segment 객체 리스트로 변환
         new_segments = []
         for i in range(segment_count):
@@ -1952,11 +1975,13 @@ class FrameLogPLR:
         for frame_no, entries in split_entries.items():
             frame_nos += [frame_no]
             if frame_no not in self.frames:
-                self.frames[frame_no] = self.create_frame(frame_no)
+                self.frames[frame_no] = self.create_frame(frame_no) # LogPLR assign
                 self.counter["mapping_table_write_miss"] += 1
             else:
                 self.counter["mapping_table_write_hit"] += 1
+            
             self.frames[frame_no].update(entries, blocknum)
+
             if self.frames[frame_no].levels > 0:
                 # self.frames[frame_no].compact()
                 self.frames[frame_no].promote()
