@@ -239,9 +239,10 @@ class Ftl(ftlbuilder.FtlBuilder):
         log_msg("="*80)
 
         log_msg("="*10, "My Learn and Write Per Flush","="*10)
-        log_msg("Avg Learning Time per Flush: {:.2f} us".format(total_my_learn_per_flush/len(total_my_learn_per_flush)))
-        log_msg("Avg Flash Write Time per Flush: {:.2f} us".format(total_my_write_per_flush/len(total_my_write_per_flush)))
-
+        avg_my_learn = sum(total_my_learn_per_flush) / len(total_my_learn_per_flush)
+        log_msg("Avg Learning Time per Flush: {:.2f} us".format(avg_my_learn))
+        avg_my_write = sum(total_my_write_per_flush) / len(total_my_write_per_flush)
+        log_msg("Avg Flash Write Time per Flush: {:.2f} us".format(avg_my_write))
         
         self.metadata.mapping_table.compact(promote=True)
 
@@ -455,6 +456,8 @@ class Ftl(ftlbuilder.FtlBuilder):
         # yield self.env.process(self.garbage_collector.clean())
 
     def write_ext(self, extent, data=None):
+        global my_learn_per_flush, total_my_learn_per_flush, my_write_per_flush, total_my_write_per_flush
+
         req_size = extent.lpn_count * self.conf.page_size
         self.recorder.add_to_general_accumulater('traffic', 'write', req_size)
         self.written_bytes += req_size
@@ -550,7 +553,7 @@ class Ftl(ftlbuilder.FtlBuilder):
                 sums = sum(my_learn_per_flush)
                 my_learn_per_flush=[]
                 total_my_learn_per_flush.append(sums*1000000) # 마이크로초 변환
-                print("learn : [%d flush] : {%.2f}".format(len(total_my_learn_per_flush),total_my_learn_per_flush[-1]))
+                print("learn : [%d flush] : %.2f us" % (len(total_my_learn_per_flush), total_my_learn_per_flush[-1]))
 
                 self.rw_cache.update_assigned(mappings)
                 total_pages_to_write.extend(pages_to_write)
@@ -568,9 +571,9 @@ class Ftl(ftlbuilder.FtlBuilder):
                     write_procs.append(p)
 
                 sums = sum(my_write_per_flush)
-                my_write_per_flush.clear=[]
+                my_write_per_flush=[]
                 total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
-                print("write : [%d flush] : {%.2f}".format(len(total_my_write_per_flush),total_my_write_per_flush[-1]))
+                print("write : [%d flush] : %.2f us" % (len(total_my_write_per_flush), total_my_write_per_flush[-1]))
 
                 for ppn in pages_to_read:
                     p = self.env.process(self._read_ppns([ppn]))
@@ -639,7 +642,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         
         # (쓰기에 걸린 시간, 쓰여진 페이지 수)를 기록
         FLASH_WRITE_SAMPLES.append((duration, len(ppns)))
-        my_write_per_flush.append(duration*1000000) # 마이크로초 변환
+        my_write_per_flush.append(duration / 1000.0) # 마이크로초 변환
 
         self.env.exit((0, 0))
 
