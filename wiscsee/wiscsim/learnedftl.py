@@ -553,6 +553,7 @@ class Ftl(ftlbuilder.FtlBuilder):
 
                 print("sum of batch size : %d" % (batch_size_total))
                 batch_size_total=0
+                sums = sum(my_learn_per_flush)
                 my_learn_per_flush=[]
                 total_my_learn_per_flush.append(sums*1000000) # 마이크로초 변환
                 print("learn : [%d flush] : %.2f us" % (len(total_my_learn_per_flush), total_my_learn_per_flush[-1]))
