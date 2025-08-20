@@ -548,7 +548,7 @@ class Ftl(ftlbuilder.FtlBuilder):
                 mappings, pages_to_read, pages_to_write = self.metadata.update(exts) # 메타 데이터 플러시
 
                 sums = sum(my_learn_per_flush)
-                my_learn_per_flush.clear()
+                my_learn_per_flush=[]
                 total_my_learn_per_flush.append(sums*1000000) # 마이크로초 변환
                 print("learn : [%d flush] : {%.2f}".format(len(total_my_learn_per_flush),total_my_learn_per_flush[-1]))
 
@@ -568,7 +568,7 @@ class Ftl(ftlbuilder.FtlBuilder):
                     write_procs.append(p)
 
                 sums = sum(my_write_per_flush)
-                my_write_per_flush.clear()
+                my_write_per_flush.clear=[]
                 total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
                 print("write : [%d flush] : {%.2f}".format(len(total_my_write_per_flush),total_my_write_per_flush[-1]))
 
