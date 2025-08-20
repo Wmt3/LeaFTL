@@ -94,6 +94,7 @@ my_learn_per_flush = []
 total_my_learn_per_flush = []
 my_write_per_flush = []
 total_my_write_per_flush = []
+batch_size_total = 0
 
 # some constants
 LPN_BYTES = 4
@@ -456,7 +457,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         # yield self.env.process(self.garbage_collector.clean())
 
     def write_ext(self, extent, data=None):
-        global my_learn_per_flush, total_my_learn_per_flush, my_write_per_flush, total_my_write_per_flush
+        global my_learn_per_flush, total_my_learn_per_flush, my_write_per_flush, total_my_write_per_flush, batch_size_total
 
         req_size = extent.lpn_count * self.conf.page_size
         self.recorder.add_to_general_accumulater('traffic', 'write', req_size)
@@ -550,7 +551,8 @@ class Ftl(ftlbuilder.FtlBuilder):
                 exts = self.rw_cache.flush_unassigned()
                 mappings, pages_to_read, pages_to_write = self.metadata.update(exts) # 메타 데이터 플러시
 
-                sums = sum(my_learn_per_flush)
+                print("sum of batch size : %d" % (batch_size_total))
+                batch_size_total=0
                 my_learn_per_flush=[]
                 total_my_learn_per_flush.append(sums*1000000) # 마이크로초 변환
                 print("learn : [%d flush] : %.2f us" % (len(total_my_learn_per_flush), total_my_learn_per_flush[-1]))
@@ -1648,8 +1650,9 @@ class LogPLR():
 
     def update(self, entries, blocknum):       
         batch_size = len(entries)
+        batch_size_total+=batch_size
         print("!**batch size:{}**".format(batch_size))
-        
+
         num_points = len(entries)
         if num_points == 0:
             return [], []
