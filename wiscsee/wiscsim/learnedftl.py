@@ -1648,7 +1648,8 @@ class LogPLR():
 
     #     return [], []
 
-    def update(self, entries, blocknum):       
+    def update(self, entries, blocknum):   
+        global batch_size_total    
         batch_size = len(entries)
         batch_size_total+=batch_size
         print("!**batch size:{}**".format(batch_size))
