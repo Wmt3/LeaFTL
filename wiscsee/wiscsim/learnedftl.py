@@ -1647,6 +1647,9 @@ class LogPLR():
     #     return [], []
 
     def update(self, entries, blocknum):       
+        batch_size = len(entries)
+        print("!**batch size:{}**".format(batch_size))
+        
         num_points = len(entries)
         if num_points == 0:
             return [], []
