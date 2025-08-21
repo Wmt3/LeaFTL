@@ -244,7 +244,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         log_msg("Avg Learning Time per Flush: {:.2f} us".format(avg_my_learn))
         avg_my_write = sum(total_my_write_per_flush) / len(total_my_write_per_flush)
         log_msg("Avg Flash Write Time per Flush: {:.2f} us".format(avg_my_write))
-        
+        log_msg("="*10)
         self.metadata.mapping_table.compact(promote=True)
 
         log_msg("End-to-end overall response time per page: %.2fus; Num of requests %d" % ((np.sum(self.write_latencies) + np.sum(self.read_latencies)) /  (self.waf["request"] + self.raf['request']), self.waf["request"] + self.raf['request']))
@@ -570,13 +570,8 @@ class Ftl(ftlbuilder.FtlBuilder):
             #     self.counter += len(exts)
             #     mappings = self.metadata.update(exts)
                 for ppn in pages_to_write:
-                    p = self.env.process(self._write_ppns([ppn])) # 실제 데이터 플러시
+                    p = self.env.process(self._write_ppns([ppn])) # 실제 데이터 플러시 -> 아닌듯, 여기서 대기열에 넣고 밑에 yield에서 실제로 작업,이게 env라는거 자체가 simpy 시뮬레이션의 어떤 내장 무언가라 ..
                     write_procs.append(p)
-
-                sums = sum(my_write_per_flush)
-                my_write_per_flush=[]
-                total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
-                print("write : [%d flush] : %.2f us" % (len(total_my_write_per_flush), total_my_write_per_flush[-1]))
 
                 for ppn in pages_to_read:
                     p = self.env.process(self._read_ppns([ppn]))
@@ -585,7 +580,12 @@ class Ftl(ftlbuilder.FtlBuilder):
             if not writeback:
                 yield self.env.timeout(CACHE_HIT)
 
-        yield simpy.AllOf(self.env, write_procs)
+        yield simpy.AllOf(self.env, write_procs) # 여기서 실제 데이터 플러시 한다고함
+
+        sums = sum(my_write_per_flush)
+        my_write_per_flush=[]
+        total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
+        print("write : [%d flush] : %.2f us" % (len(total_my_write_per_flush), total_my_write_per_flush[-1]))
 
         end_time = self.env.now # <----- end
 
@@ -633,19 +633,21 @@ class Ftl(ftlbuilder.FtlBuilder):
             self.env.exit((0,0))
             return
 
-        start_time = self.env.now
-        
+        start_time = self.env.now # self.env.now는 시뮬레이션(simpy) 내에서 측정되는 나노초 단위의 정확한 시간이라고 함
+        my_start_time = monotonic_time()
         # flash controller
         yield self.env.process(
             self.des_flash.rw_ppns(ppns, 'write',
                                    tag="Unknown"))
 
         end_time = self.env.now
+        my_end_time = monotonic_time()
         duration = end_time - start_time
+        my_duration = my_end_time - my_start_time
         
         # (쓰기에 걸린 시간, 쓰여진 페이지 수)를 기록
         FLASH_WRITE_SAMPLES.append((duration, len(ppns)))
-        my_write_per_flush.append(duration / 1000.0) # 마이크로초 변환
+        my_write_per_flush.append(my_duration / 1000.0) # 마이크로초 변환
 
         self.env.exit((0, 0))
 
