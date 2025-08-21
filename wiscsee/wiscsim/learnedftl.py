@@ -415,6 +415,8 @@ class Ftl(ftlbuilder.FtlBuilder):
 
         ppn, pages_to_write, pages_to_read = self.metadata.lpn_to_ppn(lpn)
 
+        log_msg("pages to read (must be 1~3) :",pages_to_read)
+        
         if ppn:
             # if accurate mapping entry
             if ppn not in pages_to_read:
@@ -634,7 +636,7 @@ class Ftl(ftlbuilder.FtlBuilder):
             self.env.exit((0,0))
             return
 
-        start_time = self.env.now # self.env.now는 시뮬레이션(simpy) 내에서 측정되는 나노초 단위의 정확한 시간이라고 함
+        start_time = self.env.now # self.env.now는 시뮬레이션(simpy) 내에서 측정되는 unitless의 정확한 시간이라고 함
         my_start_time = monotonic_time()
         # flash controller
         yield self.env.process(
