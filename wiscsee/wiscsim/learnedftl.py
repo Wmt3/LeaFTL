@@ -572,6 +572,11 @@ class Ftl(ftlbuilder.FtlBuilder):
                 for ppn in pages_to_write:
                     p = self.env.process(self._write_ppns([ppn])) # 실제 데이터 플러시 -> 아닌듯, 여기서 대기열에 넣고 밑에 yield에서 실제로 작업,이게 env라는거 자체가 simpy 시뮬레이션의 어떤 내장 무언가라 ..
                     write_procs.append(p)
+                    
+                sums = sum(my_write_per_flush)
+                my_write_per_flush=[]
+                total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
+                print("write : [%d flush] : %.2f us" % (len(total_my_write_per_flush), total_my_write_per_flush[-1]))
 
                 for ppn in pages_to_read:
                     p = self.env.process(self._read_ppns([ppn]))
@@ -582,11 +587,7 @@ class Ftl(ftlbuilder.FtlBuilder):
 
         yield simpy.AllOf(self.env, write_procs) # 여기서 실제 데이터 플러시 한다고함
 
-        sums = sum(my_write_per_flush)
-        my_write_per_flush=[]
-        total_my_write_per_flush.append(sums) # 이전에 마이크로초 변환 완료
-        print("write : [%d flush] : %.2f us" % (len(total_my_write_per_flush), total_my_write_per_flush[-1]))
-
+        
         end_time = self.env.now # <----- end
 
         if self.enable_recording:
