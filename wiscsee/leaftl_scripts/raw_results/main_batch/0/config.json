@@ -1,0 +1,185 @@
+{
+    "result_dir": "/home/ubuntu/LeaFTL/wiscsee/leaftl_scripts/raw_results/main_batch/0", 
+    "workload_src": "WLRUNNER", 
+    "expname": "run_expname", 
+    "time": "08-20-08-14-03", 
+    "subexpname": "run_subexpname", 
+    "ftl_type": "learnedftl", 
+    "sector_size": 512, 
+    "sort_block_trace": true, 
+    "trace_issue_and_complete": false, 
+    "enable_simulation": true, 
+    "simulation_processor": "e2e", 
+    "stripe_size": 4, 
+    "max_victim_valid_ratio": 0.9, 
+    "n_gc_procs": 1, 
+    "do_gc_after_workload": true, 
+    "snapshot_valid_ratios": false, 
+    "snapshot_erasure_count_dist": false, 
+    "snapshot_interval": null, 
+    "wear_leveling_check_interval": 20000000000, 
+    "do_wear_leveling": false, 
+    "wear_leveling_factor": 2, 
+    "wear_leveling_diff": 10, 
+    "high_log_block_ratio": 0.4, 
+    "high_data_block_ratio": 0.4, 
+    "hybridmapftl": {
+        "low_log_block_ratio": 0.32
+    }, 
+    "verbose_level": -1, 
+    "output_target": "file", 
+    "print_when_finished": false, 
+    "record_bad_victim_block": false, 
+    "linux_ncq_depth": 128, 
+    "linux_io_scheduler": "noop", 
+    "dev_size_mb": null, 
+    "tmpfs_mount_point": "/mnt/tmpfs", 
+    "device_path": "/dev/loop0", 
+    "dev_padding": 8388608, 
+    "enable_blktrace": false, 
+    "dump_ext4_after_workload": true, 
+    "event_file_column_names": [
+        "pid", 
+        "action", 
+        "operation", 
+        "offset", 
+        "size", 
+        "timestamp", 
+        "pre_wait_time", 
+        "sync"
+    ], 
+    "fs_mount_point": "/mnt/fsonloop", 
+    "mnt_opts": {
+        "ext4": {
+            "discard": {
+                "opt_name": "discard", 
+                "value": "discard", 
+                "include_name": false
+            }, 
+            "data": {
+                "opt_name": "data", 
+                "value": "ordered", 
+                "include_name": true
+            }
+        }, 
+        "btrfs": {
+            "discard": {
+                "opt_name": "discard", 
+                "value": "discard", 
+                "include_name": false
+            }, 
+            "ssd": {
+                "opt_name": "ssd", 
+                "value": "ssd", 
+                "include_name": false
+            }, 
+            "autodefrag": {
+                "opt_name": "autodefrag", 
+                "value": "autodefrag", 
+                "include_name": false
+            }
+        }, 
+        "xfs": {
+            "discard": {
+                "opt_name": "discard", 
+                "value": "discard", 
+                "include_name": false
+            }
+        }, 
+        "f2fs": {
+            "discard": {
+                "opt_name": "discard", 
+                "value": "discard", 
+                "include_name": false
+            }
+        }
+    }, 
+    "filesystem": null, 
+    "ext4": {
+        "make_opts": {
+            "-O": [
+                "^uninit_bg"
+            ], 
+            "-b": [
+                4096
+            ]
+        }
+    }, 
+    "f2fs": {
+        "make_opts": {}, 
+        "sysfs": {}
+    }, 
+    "btrfs": {
+        "make_opts": {}
+    }, 
+    "age_workload_class": "NoOp", 
+    "aging_config_key": null, 
+    "aging_config": {
+        "generating_func": "self.generate_random_workload", 
+        "chunk_count": 8, 
+        "chunk_size": 524288, 
+        "iterations": 1, 
+        "filename": "aging.file", 
+        "n_col": 5
+    }, 
+    "workload_class": "Synthetic", 
+    "workload_conf_key": "workload_conf", 
+    "workload_conf": {
+        "generating_func": "self.generate_random_workload", 
+        "chunk_count": 8, 
+        "chunk_size": 524288, 
+        "iterations": 1, 
+        "n_col": 5, 
+        "filename": "test.file"
+    }, 
+    "f2fs_gc_after_workload": true, 
+    "lba_workload_class": "Manual", 
+    "lba_workload_configs": {}, 
+    "wrap_by_perf": false, 
+    "perf": {
+        "perf_path": "perf", 
+        "flamegraph_dir": null
+    }, 
+    "linux_version": "6.8.0-1029-aws", 
+    "n_online_cpus": "all", 
+    "flash_config": {
+        "page_size": 4096, 
+        "n_pages_per_block": 256, 
+        "n_blocks_per_plane": 2048, 
+        "n_planes_per_chip": 64, 
+        "n_chips_per_package": 1, 
+        "n_packages_per_channel": 1, 
+        "n_channels_per_dev": 8, 
+        "oob_size_per_page": 128, 
+        "page_read_time": 200000, 
+        "page_prog_time": 1200000, 
+        "block_erase_time": 1600000.0, 
+        "t_WC": 0, 
+        "t_RC": 0, 
+        "t_R": 200000, 
+        "t_PROG": 1200000, 
+        "t_BERS": 1500000.0
+    }, 
+    "SSDFramework": {
+        "ncq_depth": 1
+    }, 
+    "process_queue_depth": 32, 
+    "simulator_enable_interval": false, 
+    "translation_page_entry_bytes": 4, 
+    "cache_entry_bytes": 8, 
+    "GC_high_threshold_ratio": 0.96, 
+    "GC_low_threshold_ratio": 0.5, 
+    "over_provisioning": 1.28, 
+    "mapping_cache_bytes": 1065353216, 
+    "do_not_check_gc_setting": true, 
+    "write_gc_log": true, 
+    "segment_bytes": 1099511627776, 
+    "keeping_all_tp_entries": true, 
+    "internal_ftl_type": "learnedftl", 
+    "targetdir": "/tmp/tmpresults", 
+    "simulator_class": "SimulatorDESNew", 
+    "hash": -7813027765062746177, 
+    "gamma": 0.0001, 
+    "cache_size": 8388608, 
+    "dry_run": false
+}

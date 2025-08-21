@@ -71,7 +71,7 @@ class BatchArg:
 
 
     def cmd(self):  
-        PYPY_PATH = "/home/hosing/LeaFTL/pypy2.7-v7.3.9-linux64/bin/pypy"
+        PYPY_PATH = "/home/ubuntu/.pyenv/versions/pypy2.7-7.3.12/bin/python"
         ret =  " ".join(["-%s %s" % (BatchArg.op_mapping[k], v) for k, v in self.batchArg.items() if v != None])
         if not STDOUT:
             ret = f"{PYPY_PATH} run_ftl {ret} -o {self.output_dir} >> {self.output_path}"
