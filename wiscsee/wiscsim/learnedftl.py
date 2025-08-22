@@ -1051,8 +1051,8 @@ class FlashMetadata(object):
     def lpn_to_ppn(self, lpn):
         global read_cnt
         real_ppn = None
-        self.levels[num_lookup] += 1
         results, num_lookup, pages_to_write, pages_to_read = self.mapping_table.lookup(lpn, first=True)
+        self.levels[num_lookup] += 1
         # if len(results) == 0:
         #     return None, None
         if len(results) > 0:
