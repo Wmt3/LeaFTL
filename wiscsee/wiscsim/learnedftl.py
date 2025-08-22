@@ -95,6 +95,8 @@ total_my_learn_per_flush = []
 my_write_per_flush = []
 total_my_write_per_flush = []
 batch_size_total = 0
+read_cnt = 0
+read_cnt_list = []
 
 # some constants
 LPN_BYTES = 4
@@ -161,7 +163,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         return self.metadata.lpn_to_ppn(lpn)
 
     def end_ssd(self):
-
+        global read_cnt_list
         log_msg("="*15, "MODEL CREATION TIME ANALYSIS (PER BATCH)", "="*15)
 
         total_entries_processed = 0
@@ -245,6 +247,24 @@ class Ftl(ftlbuilder.FtlBuilder):
         avg_my_write = sum(total_my_write_per_flush) / len(total_my_write_per_flush)
         log_msg("Avg Flash Write Time per Flush: {:.2f} us".format(avg_my_write))
         log_msg("="*10)
+
+        cnt1 = cnt2 = cnt3 = 0
+        for v in read_cnt_list:
+            if v == 1:
+                cnt1 += 1
+            elif v == 2:
+                cnt2 += 1
+            elif v == 3:
+                cnt3 += 1
+
+        total = len(read_cnt_list)
+
+        log_msg("="*10, "single/double/triple read", "="*10)
+        log_msg(f"1: count={cnt1}, ratio={cnt1/total:.2%}")
+        log_msg(f"2: count={cnt2}, ratio={cnt2/total:.2%}")
+        log_msg(f"3: count={cnt3}, ratio={cnt3/total:.2%}")
+
+
         self.metadata.mapping_table.compact(promote=True)
 
         log_msg("End-to-end overall response time per page: %.2fus; Num of requests %d" % ((np.sum(self.write_latencies) + np.sum(self.read_latencies)) /  (self.waf["request"] + self.raf['request']), self.waf["request"] + self.raf['request']))
@@ -415,13 +435,15 @@ class Ftl(ftlbuilder.FtlBuilder):
         #     return
 
         ppn, pages_to_write, pages_to_read = self.metadata.lpn_to_ppn(lpn)
+        log_msg("how many read :",read_cnt+1) # data page read는 항상 발생
+        read_cnt_list.append(read_cnt+1)
+        read_cnt=0
 
         if ppn:
             # if accurate mapping entry
             if ppn not in pages_to_read:
                 pages_to_read.append(ppn)
 
-            log_msg("pages to read (final):", pages_to_read)
             self.hist[len(pages_to_read)] += 1
             # if len(read_ppns) >= 2:
             #     self.datacache.set_priority(extent.lpn_start, priority=True)
@@ -1027,15 +1049,15 @@ class FlashMetadata(object):
     ############# Flash write related ############
 
     def lpn_to_ppn(self, lpn):
+        global read_cnt
         real_ppn = None
-        results, num_lookup, pages_to_write, pages_to_read = self.mapping_table.lookup(lpn, first=True)
-        print("pages to read in lpn to ppn :",pages_to_read)
         self.levels[num_lookup] += 1
+        results, num_lookup, pages_to_write, pages_to_read = self.mapping_table.lookup(lpn, first=True)
         # if len(results) == 0:
         #     return None, None
         if len(results) > 0:
             ppn, accurate, seg = results[0]
-            if accurate:
+            if accurate: # model cache에 있던 model이 
                 # pages_to_read += [ppn]
                 real_ppn = ppn
                     
@@ -1060,6 +1082,7 @@ class FlashMetadata(object):
                     self.last_oob_page.append(ppn)
                 # entry not exists; continue to search neighbor block (ppn is predicted to the wrong block)
                 else:
+                    read_cnt+=1
                     pages_to_read += [ppn]
                     if ppn % self.conf.n_pages_per_block < self.conf.n_pages_per_block / 2.0:
                         ppn = int(ppn / self.conf.n_pages_per_block) * self.conf.n_pages_per_block - 1
@@ -2012,7 +2035,9 @@ class FrameLogPLR:
 
         return pages_to_write, pages_to_read
 
+    # lookup learned index model cache
     def lookup(self, lpn, first=True):
+        global read_cnt
         should_print = False
         frame_no = lpn // self.frame_length
         results = []
@@ -2028,6 +2053,7 @@ class FrameLogPLR:
         if len(results) != 0:
             self.counter["mapping_table_read_hit"] += 1
         else:
+            read_cnt+=1
             self.counter["mapping_table_read_miss"] += 1
             frame = self.frame_on_flash[frame_no]
             blocknum = self.GTD[frame_no]
@@ -2063,7 +2089,6 @@ class FrameLogPLR:
 
         # if should_print:
         #     print("after",self.memory)
-        print("pages to read in lookup 1 :",pages_to_read)
         
         return results, lookup, pages_to_write, pages_to_read
 
