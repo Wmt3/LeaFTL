@@ -421,6 +421,7 @@ class Ftl(ftlbuilder.FtlBuilder):
         #self.env.exit(lpns_to_read)
 
     def read_logical_block(self, extent, should_print=False):
+        global read_cnt
         print("call read logical block")
         assert(extent.lpn_count == 1)
 
