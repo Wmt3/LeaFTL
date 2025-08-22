@@ -1,5 +1,5 @@
 /wiscsee/leaftl_scripts/leaftl_traces/
 /wiscsee/leaftl_scripts/leaftl_traces.zip
-!/wiscsee/leaftl_scripts/leaftl_traces/custom_usr_0.csv
-!/wiscsee/leaftl_scripts/leaftl_traces/sequential_generator.py
-!/wiscsee/leaftl_scripts/leaftl_traces/sequential_write_trace.csv
+!/wiscsee/leaftl_scripts/leaftl_traces/MSR-Cambridge/custom_usr_0.csv
+!/wiscsee/leaftl_scripts/leaftl_traces/MSR-Cambridge/sequential_generator.py
+!/wiscsee/leaftl_scripts/leaftl_traces/MSR-Cambridge/sequential_write_trace.csv
