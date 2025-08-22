@@ -420,6 +420,7 @@ class Ftl(ftlbuilder.FtlBuilder):
             if ppn not in pages_to_read:
                 pages_to_read.append(ppn)
 
+            log_msg("pages to read (final):", pages_to_read)
             self.hist[len(pages_to_read)] += 1
             # if len(read_ppns) >= 2:
             #     self.datacache.set_priority(extent.lpn_start, priority=True)
