@@ -1029,6 +1029,7 @@ class FlashMetadata(object):
     def lpn_to_ppn(self, lpn):
         real_ppn = None
         results, num_lookup, pages_to_write, pages_to_read = self.mapping_table.lookup(lpn, first=True)
+        print("pages to read in lpn to ppn :",pages_to_read)
         self.levels[num_lookup] += 1
         # if len(results) == 0:
         #     return None, None
@@ -2062,6 +2063,7 @@ class FrameLogPLR:
 
         # if should_print:
         #     print("after",self.memory)
+        print("pages to read in lookup 1 :",pages_to_read)
         
         return results, lookup, pages_to_write, pages_to_read
 
