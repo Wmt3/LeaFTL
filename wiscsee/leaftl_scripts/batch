@@ -153,7 +153,7 @@ def main_batch(generator, warmup):
     batch['start_lineno'] = [0]
     batch['lineno'] = [1000000000]
     # batch['trace'] = ["MSR-Cambridge/usr_0.csv", "MSR-Cambridge/prn_0.csv", "MSR-Cambridge/src2_0.csv", "MSR-Cambridge/hm_0.csv", "MSR-Cambridge/prxy_0.csv", 'FIU/homes/homes-110108-112108.1.blkparse', 'FIU/mail/cheetah.cs.fiu.edu-110108-113008.1.blkparse']
-    batch['trace'] = ["MSR-Cambridge/usr_0.csv"]
+    batch['trace'] = ["MSR-Cambridge/custom_usr_0.csv","MSR-Cambridge/sequential_write_trace.csv"]
     
     # sftl_cache_size = DRAM_SIZE - warmup["sftl"]*WARMUP_RATIO // MB - BITMAP_SIZE
     # leaftl_cache_size = DRAM_SIZE - warmup["learnedftl-0"]*WARMUP_RATIO // MB - BITMAP_SIZE

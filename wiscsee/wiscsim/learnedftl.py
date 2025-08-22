@@ -415,8 +415,6 @@ class Ftl(ftlbuilder.FtlBuilder):
 
         ppn, pages_to_write, pages_to_read = self.metadata.lpn_to_ppn(lpn)
 
-        log_msg("pages to read (must be 1~3) :",pages_to_read)
-        
         if ppn:
             # if accurate mapping entry
             if ppn not in pages_to_read:
@@ -1658,7 +1656,7 @@ class LogPLR():
         global batch_size_total    
         batch_size = len(entries)
         batch_size_total+=batch_size
-        print("!**batch size:{}**".format(batch_size))
+        # print("!**batch size:{}**".format(batch_size))
 
         num_points = len(entries)
         if num_points == 0:
