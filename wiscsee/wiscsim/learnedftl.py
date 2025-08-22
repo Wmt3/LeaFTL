@@ -260,9 +260,9 @@ class Ftl(ftlbuilder.FtlBuilder):
         total = len(read_cnt_list)
 
         log_msg("="*10, "single/double/triple read", "="*10)
-        log_msg(f"1: count={cnt1}, ratio={cnt1/total:.2%}")
-        log_msg(f"2: count={cnt2}, ratio={cnt2/total:.2%}")
-        log_msg(f"3: count={cnt3}, ratio={cnt3/total:.2%}")
+        log_msg("1: count={0}, ratio={1:.2%}".format(cnt1, float(cnt1)/total))
+        log_msg("2: count={0}, ratio={1:.2%}".format(cnt2, float(cnt2)/total))
+        log_msg("3: count={0}, ratio={1:.2%}".format(cnt3, float(cnt3)/total))
 
 
         self.metadata.mapping_table.compact(promote=True)
