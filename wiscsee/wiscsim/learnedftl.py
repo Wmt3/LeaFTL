@@ -373,7 +373,7 @@ class Ftl(ftlbuilder.FtlBuilder):
             cachehit, writeback, ppn = self.rw_cache.read(ext.lpn_start)
 
 
-            if not cachehit:
+            if not cachehit: # cache hit아닐때만 read logical block 호출됨에 유의.
                 procs += [self.env.process(self.read_logical_block(ext, should_print))]
             else:
                 self.hist[0] += 1
@@ -1007,6 +1007,19 @@ class OutOfBandAreasMemOpt(object):
         if abs(real_ppn - source_page) <= self.num_p2l_entries:
             return real_ppn
         return None
+    # def lpn_to_ppn(self, lpn, source_page):
+    #     # 1. source_page의 OOB 영역 읽기
+    #     oob_data = self.flash_controller.read_oob(source_page)
+        
+    #     # 2. OOB에 저장된 역방향 매핑 테이블 파싱
+    #     reverse_mappings = self.parse_oob_data(oob_data)
+        
+    #     # 3. LPN에 해당하는 실제 PPN 찾기
+    #     for entry_lpn, entry_ppn in reverse_mappings:
+    #         if entry_lpn == lpn:
+    #             return entry_ppn
+        
+    #     return None  # OOB 범위 내에 해당 LPN 없음
 
 
 
